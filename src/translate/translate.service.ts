@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 const readdir = promisify(fs.readdir);
+const mkdir = promisify(fs.mkdir);
 
 @Injectable()
 export class TranslateService {
@@ -34,6 +35,12 @@ export class TranslateService {
   ): Promise<void> {
     const files = await readdir(folderPath);
     const txtFiles = files.filter((file) => file.endsWith('.txt'));
+
+    try {
+      await readdir(outputFolderPath);
+    } catch {
+      await mkdir(outputFolderPath, { recursive: true });
+    }
 
     for (const file of txtFiles) {
       const inputFilePath = path.join(folderPath, file);
