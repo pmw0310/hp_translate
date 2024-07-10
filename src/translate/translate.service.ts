@@ -104,7 +104,6 @@ export class TranslateService {
       );
       return response.data.translations[0].text;
     } catch (err) {
-      console.log(err);
       this.logger.error(`Translation error: ${err}`);
       return text; // 번역 실패 시 원문 반환
     }
