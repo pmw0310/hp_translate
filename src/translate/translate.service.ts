@@ -2,9 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import * as path from 'path';
-import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
+import * as deepl from 'deepl-node';
 
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
@@ -16,17 +15,19 @@ export class TranslateService {
   private readonly logger = new Logger('Translate');
 
   private readonly apiKey: string;
-  private readonly apiUrl = 'https://api-free.deepl.com/v2/translate';
-  private readonly sourceLang: string;
-  private readonly targetLang: string;
+  private readonly sourceLang: deepl.SourceLanguageCode | null;
+  private readonly targetLang: deepl.TargetLanguageCode;
+  private translator: deepl.Translator;
 
-  constructor(
-    private configService: ConfigService,
-    private httpService: HttpService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     this.apiKey = this.configService.get<string>('DEEPL_API_KEY');
-    this.sourceLang = this.configService.get<string | undefined>('SOURCE_LANG');
-    this.targetLang = this.configService.get<string>('TARGET_LANG');
+    this.sourceLang =
+      this.configService.get<deepl.SourceLanguageCode | undefined>(
+        'SOURCE_LANG',
+      ) ?? null;
+    this.targetLang =
+      this.configService.get<deepl.TargetLanguageCode>('TARGET_LANG');
+    this.translator = new deepl.Translator(this.apiKey);
   }
 
   async translateFolder(
@@ -77,7 +78,21 @@ export class TranslateService {
           return line;
         }
 
-        const translatedText = await this.translateText(text);
+        let translatedText: string;
+
+        try {
+          const result = await this.translator.translateText(
+            text,
+            this.sourceLang,
+            this.targetLang,
+            { formality: 'prefer_less' },
+          );
+          translatedText = result.text;
+        } catch (e) {
+          this.logger.error(e);
+          translatedText = text;
+        }
+
         return `${key}|${translatedText}`;
       }),
     );
@@ -87,25 +102,5 @@ export class TranslateService {
     });
 
     this.logger.log(`Translation success: ${outputFilePath}`);
-  }
-
-  async translateText(text: string): Promise<string> {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          this.apiUrl,
-          new URLSearchParams({
-            auth_key: this.apiKey,
-            text: text,
-            target_lang: this.targetLang,
-            source_lang: this.sourceLang,
-          }),
-        ),
-      );
-      return response.data.translations[0].text;
-    } catch (err) {
-      this.logger.error(`Translation error: ${err.message}`);
-      return text; // 번역 실패 시 원문 반환
-    }
   }
 }
