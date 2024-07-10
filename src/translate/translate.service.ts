@@ -104,7 +104,7 @@ export class TranslateService {
       );
       return response.data.translations[0].text;
     } catch (err) {
-      this.logger.error(`Translation error: ${err}`);
+      this.logger.error(`Translation error: ${err.message}`);
       return text; // 번역 실패 시 원문 반환
     }
   }
