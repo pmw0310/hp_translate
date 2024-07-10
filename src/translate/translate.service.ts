@@ -64,7 +64,6 @@ export class TranslateService {
     const translatedLines = await Promise.all(
       lines.map(async (line) => {
         if (
-          line === '' ||
           line === '\n' ||
           line === '\r' ||
           (line.startsWith('[') && line.endsWith(']\r'))
