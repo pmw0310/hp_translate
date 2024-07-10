@@ -54,11 +54,21 @@ export class TranslateService {
     outputFilePath: string,
   ): Promise<void> {
     const content = await readFile(inputFilePath, { encoding: 'utf16le' });
-    const lines = content.split('\n');
+    let lines: string[];
+    lines = content.split('\n');
+
+    if (lines.length === 1) {
+      lines = content.split('\r');
+    }
 
     const translatedLines = await Promise.all(
       lines.map(async (line) => {
-        if (line == '\r' || (line.startsWith('[') && line.endsWith(']\r'))) {
+        if (
+          line === '' ||
+          line === '\n' ||
+          line === '\r' ||
+          (line.startsWith('[') && line.endsWith(']\r'))
+        ) {
           return line;
         }
 
@@ -94,6 +104,7 @@ export class TranslateService {
       );
       return response.data.translations[0].text;
     } catch (err) {
+      console.log(err);
       this.logger.error(`Translation error: ${err}`);
       return text; // 번역 실패 시 원문 반환
     }
