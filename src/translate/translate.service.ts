@@ -62,40 +62,41 @@ export class TranslateService {
       lines = content.split('\r');
     }
 
-    const translatedLines = await Promise.all(
-      lines.map(async (line) => {
-        if (
-          line === '\n' ||
-          line === '\r' ||
-          (line.startsWith('[') &&
-            (line.endsWith(']\r') || line.endsWith(']\n')))
-        ) {
-          return line;
-        }
+    const translatedLines: string[] = [];
 
-        const [key, text] = line.split('|');
-        if (!text) {
-          return line;
-        }
+    for (const line of lines) {
+      if (
+        line === '\n' ||
+        line === '\r' ||
+        (line.startsWith('[') && (line.endsWith(']\r') || line.endsWith(']\n')))
+      ) {
+        translatedLines.push(line);
+        continue;
+      }
 
-        let translatedText: string;
+      const [key, text] = line.split('|');
+      if (!text) {
+        translatedLines.push(line);
+        continue;
+      }
 
-        try {
-          const result = await this.translator.translateText(
-            text,
-            this.sourceLang,
-            this.targetLang,
-            { formality: 'prefer_less' },
-          );
-          translatedText = result.text;
-        } catch (e) {
-          this.logger.error(e);
-          translatedText = text;
-        }
+      let translatedText: string;
 
-        return `${key}|${translatedText}`;
-      }),
-    );
+      try {
+        const result = await this.translator.translateText(
+          text,
+          this.sourceLang,
+          this.targetLang,
+          { formality: 'prefer_less' },
+        );
+        translatedText = result.text;
+      } catch (e) {
+        this.logger.error(e);
+        translatedText = text;
+      }
+
+      translatedLines.push(`${key}|${translatedText}`);
+    }
 
     await writeFile(outputFilePath, translatedLines.join('\n'), {
       encoding: 'utf16le',
