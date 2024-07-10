@@ -72,7 +72,7 @@ export class TranslateService {
       }),
     );
 
-    await writeFile(outputFilePath, translatedLines.join('\r'), {
+    await writeFile(outputFilePath, translatedLines.join('\n'), {
       encoding: 'utf16le',
     });
 
