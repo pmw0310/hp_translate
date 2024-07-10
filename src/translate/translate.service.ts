@@ -66,7 +66,8 @@ export class TranslateService {
         if (
           line === '\n' ||
           line === '\r' ||
-          (line.startsWith('[') && line.endsWith(']\r'))
+          (line.startsWith('[') &&
+            (line.endsWith(']\r') || line.endsWith(']\n')))
         ) {
           return line;
         }
