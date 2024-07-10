@@ -25,7 +25,7 @@ export class TranslateService {
     private httpService: HttpService,
   ) {
     this.apiKey = this.configService.get<string>('DEEPL_API_KEY');
-    this.sourceLang = this.configService.get<string>('SOURCE_LANG');
+    this.sourceLang = this.configService.get<string | undefined>('SOURCE_LANG');
     this.targetLang = this.configService.get<string>('TARGET_LANG');
   }
 
