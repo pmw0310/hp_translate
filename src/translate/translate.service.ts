@@ -64,6 +64,12 @@ export class TranslateService {
 
     const translatedLines: string[] = [];
 
+    let count = 0;
+
+    const log = () => {
+      this.logger.log(`${((++count / lines.length) * 100).toFixed(2)}%`);
+    };
+
     for (const line of lines) {
       if (
         line === '\n' ||
@@ -71,12 +77,14 @@ export class TranslateService {
         (line.startsWith('[') && (line.endsWith(']\r') || line.endsWith(']\n')))
       ) {
         translatedLines.push(line);
+        log();
         continue;
       }
 
       const [key, text] = line.split('|');
       if (!text) {
         translatedLines.push(line);
+        log();
         continue;
       }
 
@@ -93,6 +101,8 @@ export class TranslateService {
       } catch (e) {
         this.logger.error(e);
         translatedText = text;
+      } finally {
+        log();
       }
 
       translatedLines.push(`${key}|${translatedText}`);
