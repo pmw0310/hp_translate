@@ -10,6 +10,7 @@ $ npm install
 DEEPL_API_KEY=
 SOURCE_LANG=
 TARGET_LANG=
+ENCODING=
 ```
 
 ## Running the app

@@ -10,6 +10,8 @@ const writeFile = promisify(fs.writeFile);
 const readdir = promisify(fs.readdir);
 const mkdir = promisify(fs.mkdir);
 
+const passReg = /^\r\n|^\r|^\n|^\s*\[/;
+
 @Injectable()
 export class TranslateService {
   private readonly logger = new Logger('Translate');
@@ -17,6 +19,7 @@ export class TranslateService {
   private readonly apiKey: string;
   private readonly sourceLang: deepl.SourceLanguageCode | null;
   private readonly targetLang: deepl.TargetLanguageCode;
+  private readonly encoding: BufferEncoding;
   private translator: deepl.Translator;
 
   constructor(private readonly configService: ConfigService) {
@@ -28,6 +31,8 @@ export class TranslateService {
     this.targetLang =
       this.configService.get<deepl.TargetLanguageCode>('TARGET_LANG');
     this.translator = new deepl.Translator(this.apiKey);
+    this.encoding =
+      this.configService.get<BufferEncoding>('ENCODING') ?? 'utf8';
   }
 
   async translateFolder(
@@ -54,7 +59,7 @@ export class TranslateService {
     inputFilePath: string,
     outputFilePath: string,
   ): Promise<void> {
-    const content = await readFile(inputFilePath, { encoding: 'utf16le' });
+    const content = await readFile(inputFilePath, { encoding: this.encoding });
     let lines: string[];
     lines = content.split('\n');
 
@@ -71,21 +76,20 @@ export class TranslateService {
     };
 
     for (const line of lines) {
-      if (
-        line === '\n' ||
-        line === '\r' ||
-        (line.startsWith('[') && (line.endsWith(']\r') || line.endsWith(']\n')))
-      ) {
+      if (passReg.test(line)) {
         translatedLines.push(line);
         log();
         continue;
       }
 
-      const [key, text] = line.split('|');
+      let [key, text] = line.split('|');
+
       if (!text) {
-        translatedLines.push(line);
-        log();
-        continue;
+        text = key;
+        key = '';
+        // translatedLines.push(line);
+        // log();
+        // continue;
       }
 
       let translatedText: string;
@@ -105,11 +109,15 @@ export class TranslateService {
         log();
       }
 
-      translatedLines.push(`${key}|${translatedText}`);
+      if (key) {
+        translatedLines.push(`${key}|${translatedText}`);
+      } else {
+        translatedLines.push(translatedText);
+      }
     }
 
     await writeFile(outputFilePath, translatedLines.join('\n'), {
-      encoding: 'utf16le',
+      encoding: this.encoding,
     });
 
     this.logger.log(`Translation success: ${outputFilePath}`);
