@@ -11,6 +11,19 @@ const readdir = promisify(fs.readdir);
 const mkdir = promisify(fs.mkdir);
 
 const passReg = /^\r\n|^\r|^\n|^\s*\[/;
+const breakingReg = /\r\n|\r|\n/;
+
+const splitIntoChunk = <T>(arr: T[], chunk: number): T[][] => {
+  const array = [...arr];
+  const result: T[][] = [];
+
+  while (array.length > 0) {
+    const tempArray = array.splice(0, chunk);
+    result.push(tempArray);
+  }
+
+  return result;
+};
 
 @Injectable()
 export class TranslateService {
@@ -60,12 +73,10 @@ export class TranslateService {
     outputFilePath: string,
   ): Promise<void> {
     const content = await readFile(inputFilePath, { encoding: this.encoding });
-    let lines: string[];
-    lines = content.split('\n');
-
-    if (lines.length === 1) {
-      lines = content.split('\r');
-    }
+    const lines: string[][] = splitIntoChunk<string>(
+      content.split(breakingReg),
+      20,
+    );
 
     const translatedLines: string[] = [];
 
@@ -73,47 +84,66 @@ export class TranslateService {
 
     const log = () => {
       this.logger.log(`${((++count / lines.length) * 100).toFixed(2)}%`);
+      console.log(count, lines.length);
     };
 
-    for (const line of lines) {
-      if (passReg.test(line)) {
-        translatedLines.push(line);
-        log();
-        continue;
-      }
+    for (const lineArray of lines) {
+      const texts: Map<number, { key: string; text: string }> = new Map();
 
-      let [key, text] = line.split('|');
+      lineArray.forEach((line, index) => {
+        if (passReg.test(line)) {
+          return;
+        }
 
-      if (!text) {
-        text = key;
-        key = '';
-        // translatedLines.push(line);
-        // log();
-        // continue;
-      }
+        let [key, text] = line.split('|');
 
-      let translatedText: string;
+        if (!text) {
+          text = key;
+          key = '';
+        }
+
+        text = text.replace(breakingReg, '');
+        if (text) {
+          texts.set(index, { key, text });
+        }
+      });
+
+      let translatedTexts: string[];
+      const sendTexts = Array.from(texts.keys())
+        .sort()
+        .map((index) => texts.get(index).text);
 
       try {
         const result = await this.translator.translateText(
-          text,
+          sendTexts,
           this.sourceLang,
           this.targetLang,
           { formality: 'prefer_less' },
         );
-        translatedText = result.text;
+        translatedTexts = result.map(({ text }) => text);
       } catch (e) {
         this.logger.error(e);
-        translatedText = text;
-      } finally {
-        log();
+        translatedTexts = sendTexts;
       }
 
-      if (key) {
-        translatedLines.push(`${key}|${translatedText}`);
-      } else {
-        translatedLines.push(translatedText);
-      }
+      let translatedTextCount = 0;
+
+      lineArray.forEach((line, index) => {
+        if (texts.has(index)) {
+          const { key } = texts.get(index);
+          const translatedText = translatedTexts[translatedTextCount++];
+
+          if (key) {
+            translatedLines.push(`${key}|${translatedText}`);
+          } else {
+            translatedLines[translatedLines.length - 1] += ` ${translatedText}`;
+          }
+        } else {
+          translatedLines.push(line);
+        }
+      });
+
+      log();
     }
 
     await writeFile(outputFilePath, translatedLines.join('\n'), {
